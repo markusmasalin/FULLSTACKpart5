@@ -8,17 +8,17 @@ import ToggleBlog from './components/ToggleBlog'
 import BlogForm from './components/BlogForm'
 import Footer from './components/Footer'
 import SimpleBlog from './components/SimpleBlog'
-import  { useField } from './hooks'
+import  { useField, useResource } from './hooks'
 
-import blogService from './services/blogs'
+//import blogService from './services/blogs'
 import loginService from './services/login'
 
 
 const App = () => {
-  const [blogs, setBlogs] = useState([])
-  const [ newAuthor, setNewAuthor ] = useState('')
-  const [ newTitle, setNewTitle ] = useState('')
-  const [ newUrl, setNewUrl ] = useState('')
+  const [blogs, blogService] = useResource('/api/blogs')
+  const author = useField('text')
+  const title = useField('text')
+  const url = useField('text')
   const [errorMessage, setErrorMessage] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const username = useField('text')
@@ -28,11 +28,7 @@ const App = () => {
   const [user, setUser] = useState(null)
   const [loginVisible, setLoginVisible] = useState(false)
 
-  useEffect(() => {
-    blogService
-      .getAll()
-      .then(initialBlogs => setBlogs(initialBlogs))
-  }, [])
+ 
 
   useEffect(() => {
     const loggedUserJSON = window.localStorage.getItem('loggedBlogappUser')
@@ -46,11 +42,13 @@ const App = () => {
   const handleLogin = async (event) => {
     event.preventDefault()
     
+    const credentials = {
+      username: username.value,
+      password: password.value
+    }
 
     try {
-      const user = await loginService.login({
-        username, password
-      })
+      const user = await loginService.login(credentials)
       window.localStorage.setItem(
         'loggedBlogappUser', JSON.stringify(user)
       )
@@ -62,6 +60,8 @@ const App = () => {
       setSuccessMessage(user.name+ 'has logged in')
     } catch (exception) {
       setErrorMessage('wrong credentials')
+      username.reset()
+      password.reset()
       setTimeout(() => {
         setErrorMessage(null)
       }, 5000)
@@ -151,7 +151,7 @@ const App = () => {
   }
 
   const blogFormRef = React.createRef()
-
+/*
   const handleAuthorChange = (event) => {
     setNewAuthor(event.target.value)
   }
@@ -161,23 +161,24 @@ const App = () => {
   const handleUrlChange = (event) => {
     setNewUrl(event.target.value)
   }
-
+*/
   const addBlog = async(event) => {
     event.preventDefault()
     blogFormRef.current.toggleVisibility()
     console.log('submitting blog')
     const blogObject = {
-      author: newAuthor,
-      title: newTitle,
-      url: newUrl,
+      author: author.value,
+      title: title.value,
+      url: url.value,
       id: blogs.length + 1,
     }
     try {
-      const addedBlog = await blogService.create(blogObject)
-      setBlogs(blogs.concat(addedBlog))
-      setNewAuthor('')
-      setNewTitle('')
-      setNewUrl('')
+      await blogService.create(blogObject)
+      await blogService.getAll()
+      // setBlogs(blogs.concat(addedBlog))
+      title.reset()
+      author.reset()
+      url.reset()
       setSuccessMessage(
         `${blogObject.title} is added to the list`
       )
@@ -205,7 +206,7 @@ const App = () => {
     if (ok){
       try{
         await blogService.deleteBlog(event.id)
-        setBlogs(blogs.filter(p => p.id !== event.id)) 
+        await blogService.getAll()
         setSuccessMessage(
           `${blog.author} is deleted from the list`
         )
@@ -238,11 +239,11 @@ const App = () => {
     }
     console.log(event.likes)
     try{
-      const likedBlog = await blogService.update(event.id, updatedBlogObject)    
+      await blogService.update(event.id, updatedBlogObject)    
       setSuccessMessage(
         `thank you for liking  ${event.title} `
       )
-      setBlogs(blogs.map(blog => blog.id !== event.id ? blog : likedBlog))
+      await blogService.getAll()
       console.log(successMessage)
       setTimeout(() => {
         setSuccessMessage(null)
@@ -281,12 +282,9 @@ const App = () => {
           <Togglable buttonLabel="create" ref={blogFormRef}>
             <BlogForm
               onSubmit={addBlog}
-              newAuthor={newAuthor}
-              handleAuthorChange={handleAuthorChange}
-              newTitle={newTitle}
-              handleTitleChange={handleTitleChange}
-              newUrl={newUrl}
-              handleUrlChange={handleUrlChange}
+              author={author}
+              title={title}
+              url={url}
             />
           </Togglable>
           <button onClick={() => handleLogout()}>logout</button>
